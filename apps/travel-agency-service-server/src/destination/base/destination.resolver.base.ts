@@ -13,16 +13,31 @@ import * as graphql from "@nestjs/graphql";
 import { GraphQLError } from "graphql";
 import { isRecordNotFoundError } from "../../prisma.util";
 import { MetaQueryPayload } from "../../util/MetaQueryPayload";
+import * as nestAccessControl from "nest-access-control";
+import * as gqlACGuard from "../../auth/gqlAC.guard";
+import { GqlDefaultAuthGuard } from "../../auth/gqlDefaultAuth.guard";
+import * as common from "@nestjs/common";
+import { AclFilterResponseInterceptor } from "../../interceptors/aclFilterResponse.interceptor";
 import { Destination } from "./Destination";
 import { DestinationCountArgs } from "./DestinationCountArgs";
 import { DestinationFindManyArgs } from "./DestinationFindManyArgs";
 import { DestinationFindUniqueArgs } from "./DestinationFindUniqueArgs";
 import { DeleteDestinationArgs } from "./DeleteDestinationArgs";
 import { DestinationService } from "../destination.service";
+@common.UseGuards(GqlDefaultAuthGuard, gqlACGuard.GqlACGuard)
 @graphql.Resolver(() => Destination)
 export class DestinationResolverBase {
-  constructor(protected readonly service: DestinationService) {}
+  constructor(
+    protected readonly service: DestinationService,
+    protected readonly rolesBuilder: nestAccessControl.RolesBuilder
+  ) {}
 
+  @graphql.Query(() => MetaQueryPayload)
+  @nestAccessControl.UseRoles({
+    resource: "Destination",
+    action: "read",
+    possession: "any",
+  })
   async _destinationsMeta(
     @graphql.Args() args: DestinationCountArgs
   ): Promise<MetaQueryPayload> {
@@ -32,14 +47,26 @@ export class DestinationResolverBase {
     };
   }
 
+  @common.UseInterceptors(AclFilterResponseInterceptor)
   @graphql.Query(() => [Destination])
+  @nestAccessControl.UseRoles({
+    resource: "Destination",
+    action: "read",
+    possession: "any",
+  })
   async destinations(
     @graphql.Args() args: DestinationFindManyArgs
   ): Promise<Destination[]> {
     return this.service.destinations(args);
   }
 
+  @common.UseInterceptors(AclFilterResponseInterceptor)
   @graphql.Query(() => Destination, { nullable: true })
+  @nestAccessControl.UseRoles({
+    resource: "Destination",
+    action: "read",
+    possession: "own",
+  })
   async destination(
     @graphql.Args() args: DestinationFindUniqueArgs
   ): Promise<Destination | null> {
@@ -51,6 +78,11 @@ export class DestinationResolverBase {
   }
 
   @graphql.Mutation(() => Destination)
+  @nestAccessControl.UseRoles({
+    resource: "Destination",
+    action: "delete",
+    possession: "any",
+  })
   async deleteDestination(
     @graphql.Args() args: DeleteDestinationArgs
   ): Promise<Destination | null> {
